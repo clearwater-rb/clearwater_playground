@@ -113,15 +113,17 @@ class Editor
 
     case key
     when 8 # Backspace
-      code = @lang.code
-      cursor_position = input.selection_start
-      if code[cursor_position - 2...cursor_position] == '  '
-        event.prevent
+      if input.selection_start == input.selection_end # Nothing selected
+        code = @lang.code
+        cursor_position = input.selection_start
+        if code[cursor_position - 2...cursor_position] == '  '
+          event.prevent
 
-        UpdateCode.(@lang, "#{code[0...cursor_position - 2]}#{code[cursor_position..-1]}")
-        Bowser.window.animation_frame do
-          input.selection_start = cursor_position - 2
-          input.selection_end = cursor_position - 2
+          UpdateCode.(@lang, "#{code[0...cursor_position - 2]}#{code[cursor_position..-1]}")
+          Bowser.window.animation_frame do
+            input.selection_start = cursor_position - 2
+            input.selection_end = cursor_position - 2
+          end
         end
       end
     when 9 # Tab
