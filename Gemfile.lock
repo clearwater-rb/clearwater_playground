@@ -1,5 +1,7 @@
-PATH
-  remote: ../grand_central
+GIT
+  remote: git://github.com/clearwater-rb/grand_central.git
+  revision: ce1918e07afc5687685a2999a33f7867023860e4
+  branch: elm-style-dispatching
   specs:
     grand_central (0.3.3)
 
