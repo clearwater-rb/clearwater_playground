@@ -1,6 +1,7 @@
 require 'bundler/setup'
 require 'opal'
 require 'clearwater'
+require 'grand_central'
 require 'roda/opal_assets'
 
 # Keep a single asset compiler in case we want to use it for multiple tasks.

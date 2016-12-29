@@ -2,6 +2,9 @@ require 'roda'
 require 'roda/opal_assets'
 require 'opal'
 require 'clearwater'
+require 'grand_central'
+
+require 'api'
 
 class ClearwaterPlayground < Roda
   plugin :public
@@ -11,6 +14,8 @@ class ClearwaterPlayground < Roda
   route do |r|
     r.public
     assets.route r
+
+    r.on('api') { r.run API }
 
     <<-HTML
 <!DOCTYPE html>
