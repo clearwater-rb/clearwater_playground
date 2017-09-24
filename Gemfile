@@ -1,10 +1,9 @@
 source 'https://rubygems.org'
 
-gem 'opal'
-gem 'clearwater', '~> 1.0.0.rc4'
-gem 'grand_central', github: 'clearwater-rb/grand_central', branch: 'elm-style-dispatching'
+gem 'clearwater', '~> 1.0.0.rc5'
+gem 'grand_central'
 gem 'roda'
-gem 'roda-opal_assets'
+gem 'roda-opal_assets', '>= 0.3.0'
 gem 'puma'
 gem 'sequel'
 gem 'pg'

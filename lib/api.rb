@@ -25,7 +25,7 @@ class API < Roda
   end
 
   class App
-    def initialize attrs={}
+    def initialize(id: nil, name:)
       @id = attrs[:id]
       @name = attrs[:name]
     end

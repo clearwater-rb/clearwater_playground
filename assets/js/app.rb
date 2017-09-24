@@ -19,6 +19,7 @@ class Layout
 
   def render
     div([
+      Header.new(html, css, ruby),
       CodeEditor.new(html, css, ruby, js),
       RunningExample.new(html, css, js),
     ])
@@ -26,6 +27,41 @@ class Layout
 
   def state
     store.state
+  end
+end
+
+class Header
+  include Clearwater::Component
+
+  attr_reader :html, :css, :ruby
+
+  def initialize html, css, ruby
+    @html = html
+    @css = css
+    @ruby = ruby
+  end
+
+  def render
+    div([
+      h1({
+        style: {
+          'font-size': '2.5vh',
+          font_family: [
+            'Helvetica Neue',
+            'Sans-Serif',
+          ],
+          height: '3vh',
+        },
+      }, [
+        'Clearwater Playground',
+      ]),
+      div([
+        [html, css, ruby].map { |lang|
+          button({ onclick: ToggleEditor[lang] }, "Toggle #{lang.name}")
+        },
+        button({ onclick: ToggleJS }, 'Toggle compiled JS'),
+      ]),
+    ])
   end
 end
 
@@ -39,24 +75,11 @@ class CodeEditor
   end
 
   def render
-    div([
-      div([
-        [html, css, ruby].map { |lang|
-          button({ onclick: ToggleEditor[lang] }, "Toggle #{lang.name}")
-        },
-        button({ onclick: ToggleJS }, 'Toggle compiled JS'),
-      ]),
-
-      p([
-        'Pardon the lack of syntax highlighting for now. These are plain ',
-        code({ style: { font_size: '16px' } }, 'textarea'),
-        "s until I can find a web-based code editor I don't hate using.",
-      ]),
-
+    div({ style: Style.editor_container }, [
       [html, css, ruby].map { |lang|
         if lang.show?
           div({ style: Style.editor(total_editors) }, [
-            Editor.new(lang)
+            AceEditor.new(lang)
           ])
         end
       },
@@ -75,12 +98,73 @@ class CodeEditor
   module Style
     module_function
 
-    def editor(total_editors=1)
+    def editor_container
       {
         display: 'inline-block',
-        width: "#{100 / [total_editors, 1].max}%",
+        box_sizing: 'border-box',
+        vertical_align: :top,
+        width: '50%',
+      }
+    end
+
+    def editor(total_editors=1)
+      {
+        height: "#{90 / [total_editors, 1].max}vh",
         vertical_align: :top,
       }
+    end
+  end
+end
+
+class AceEditor
+  include Clearwater::BlackBoxNode
+
+  attr_reader :editor, :height
+
+  def initialize lang
+    @lang = lang
+    @id = lang.name
+    @code = lang.code
+  end
+
+  def key
+    @id
+  end
+
+  def node
+    Clearwater::Component.div({
+      id: @lang.name,
+      style: {
+        height: '100%',
+        font_size: '16px',
+      },
+    }, @code)
+  end
+
+  def mount element
+    Bowser.window.animation_frame do
+      @editor = `ace.edit(#@id)`
+      @editor.JS.setTheme 'ace/theme/monokai'
+      @editor.JS.getSession.JS.setTabSize 2
+      @editor.JS.getSession.JS.setMode "ace/mode/#@id"
+      @editor.JS.on(:change, proc { |e|
+        UpdateCode[@lang].call `#@editor.getSession().getDocument().getValue()`
+      })
+      @height = element.client_height
+    end
+  end
+
+  def update previous, element
+    # Copy properties from previous instance
+    @editor = previous.editor
+    @height = previous.height
+
+    Bowser.window.animation_frame do
+      # If they're different, tell the editor
+      if @height != element.client_height
+        @height = element.client_height
+        @editor.JS.resize
+      end
     end
   end
 end
@@ -101,18 +185,17 @@ class Editor
       style: {
         font_size: '14px',
         font_family: ['Monaco', 'Menlo', 'Courier New', 'Monospace'],
-        width: '100%',
-        height: '300px',
+        width: '99%',
+        height: '100%',
       },
     )
   end
 
   def check_key event
-    key = event.key_code
     input = event.target
 
-    case key
-    when 8 # Backspace
+    case event.key
+    when :Backspace
       if input.selection_start == input.selection_end # Nothing selected
         code = @lang.code
         cursor_position = input.selection_start
@@ -126,7 +209,7 @@ class Editor
           end
         end
       end
-    when 9 # Tab
+    when :Tab
       event.prevent
       code = @lang.code
       cursor_position = input.selection_start
@@ -137,7 +220,7 @@ class Editor
         input.selection_start = cursor_position + 2
         input.selection_end = cursor_position + 2
       end
-    when 13 # Enter
+    when :Enter
       event.prevent
       code = @lang.code
       cursor_position = input.selection_start
@@ -177,7 +260,13 @@ class RunningExample
   def node
     iframe(
       srcdoc: srcdoc,
-      style: { width: '100%', height: '50vh' },
+      style: {
+        box_sizing: 'border-box',
+        display: 'inline-block',
+        vertical_align: :top,
+        width: '50%',
+        height: '90vh'
+      },
     )
   end
 
@@ -189,11 +278,17 @@ class RunningExample
   def update previous, node
     previous.will_render = false
 
-    # Throttle running-code updates to 3 per second. Otherwise, we just spend
-    # a ton of CPU time rebooting iframes.
-    Bowser.window.delay 1/3 do
-      node.srcdoc = srcdoc if will_render && srcdoc != previous.srcdoc
-      @will_render = false
+    if Time.now - previous.rendered_at < 600 # cap an iframe to be 10 minutes old
+      # Throttle running-code updates to 1 per second. Otherwise, we just spend
+      # a ton of CPU time rebooting iframes.
+      Bowser.window.delay 1 do
+        node.srcdoc = srcdoc if will_render && srcdoc != previous.srcdoc
+        @will_render = false
+      end
+      @rendered_at = previous.rendered_at
+    else
+      @rendered_at = Time.now
+      render.create_element
     end
   end
 
@@ -324,6 +419,7 @@ class AppState < GrandCentral::Model
   end
 
   def compile_js
+    start = Time.now
     Opal.compile(ruby.code.to_s).to_s
   rescue SyntaxError => e
     <<-JS
@@ -331,6 +427,9 @@ class AppState < GrandCentral::Model
 #{e.message}
 */
     JS
+  ensure
+    finish = Time.now
+    puts "Compiled (or errored) in #{(finish - start) * 1000}ms"
   end
 end
 
@@ -353,7 +452,10 @@ class Layout
   include Clearwater::Component
 
   def render
-    div 'hello world'
+    div([
+      h1('Hello World!'),
+      p('Welcome to Clearwater!'),
+    ])
   end
 end
 
@@ -364,7 +466,7 @@ Clearwater::Application.new(
     RUBY
     show: true,
   ),
-  show_js: true,
+  show_js: false,
 )
 
 store = GrandCentral::Store.new(initial_state) do |state, action|

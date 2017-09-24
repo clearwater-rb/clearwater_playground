@@ -4,6 +4,9 @@ $LOAD_PATH << 'lib'
 
 require './clearwater_playground'
 
-use Rack::Session::Cookie, secret: ENV.fetch('SESSION_SECRET')
+use Rack::Session::Cookie, secret: ENV.fetch('SESSION_SECRET') {
+  require 'securerandom'
+  SecureRandom.hex
+}
 use Rack::Deflater
 run ClearwaterPlayground

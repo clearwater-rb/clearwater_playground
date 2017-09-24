@@ -27,6 +27,7 @@ class ClearwaterPlayground < Roda
 
   <body>
     <div id="app"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.8/ace.js"></script>
     #{assets.js 'app.js'}
   </body>
 </html>
