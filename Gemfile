@@ -7,10 +7,10 @@ gem 'roda-opal_assets'
 gem 'puma'
 gem 'neo4j'
 gem 'primalize'
+gem 'rake'
 
 group :development do
   gem 'rerun'
-  gem 'rake'
   gem 'rspec'
   gem 'rack-test'
   gem 'pry'
