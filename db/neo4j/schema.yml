@@ -1,0 +1,55 @@
+# This file is auto-generated from the current state of the database. Instead
+# of editing this file, please use the migrations feature of ActiveNode to
+# incrementally modify your database, and then regenerate this schema definition.
+#
+# Note that this schema.yml definition is the authoritative source for your
+# database schema. If you need to create the application database on another
+# system, you should be using neo4j:schema:load, not running all the migrations
+# from scratch. The latter is a flawed and unsustainable approach (the more migrations
+# you'll amass, the slower it'll run and the greater likelihood for issues).
+#
+# It's strongly recommended that you check this file into your version control system.
+
+---
+:constraints:
+- CONSTRAINT ON ( `neo4j::migrations::schemamigration`:`Neo4j::Migrations::SchemaMigration`
+  ) ASSERT `neo4j::migrations::schemamigration`.migration_id IS UNIQUE
+- CONSTRAINT ON ( account:Account ) ASSERT account.uuid IS UNIQUE
+- CONSTRAINT ON ( brand:Brand ) ASSERT brand.uuid IS UNIQUE
+- CONSTRAINT ON ( business:Business ) ASSERT business.uuid IS UNIQUE
+- CONSTRAINT ON ( cannedresponse:CannedResponse ) ASSERT cannedresponse.uuid IS UNIQUE
+- CONSTRAINT ON ( device:Device ) ASSERT device.uuid IS UNIQUE
+- CONSTRAINT ON ( devicecolor:DeviceColor ) ASSERT devicecolor.uuid IS UNIQUE
+- CONSTRAINT ON ( deviceimage:DeviceImage ) ASSERT deviceimage.uuid IS UNIQUE
+- CONSTRAINT ON ( group:Group ) ASSERT group.uuid IS UNIQUE
+- CONSTRAINT ON ( hour:Hour ) ASSERT hour.uuid IS UNIQUE
+- CONSTRAINT ON ( issue:Issue ) ASSERT issue.uuid IS UNIQUE
+- CONSTRAINT ON ( lineitem:LineItem ) ASSERT lineitem.uuid IS UNIQUE
+- CONSTRAINT ON ( payout:Payout ) ASSERT payout.uuid IS UNIQUE
+- CONSTRAINT ON ( payscale:PayScale ) ASSERT payscale.uuid IS UNIQUE
+- CONSTRAINT ON ( playground:Playground ) ASSERT playground.uuid IS UNIQUE
+- CONSTRAINT ON ( product:Product ) ASSERT product.uuid IS UNIQUE
+- CONSTRAINT ON ( region:Region ) ASSERT region.uuid IS UNIQUE
+- CONSTRAINT ON ( repair:Repair ) ASSERT repair.uuid IS UNIQUE
+- CONSTRAINT ON ( repairbatch:RepairBatch ) ASSERT repairbatch.uuid IS UNIQUE
+- CONSTRAINT ON ( repairrating:RepairRating ) ASSERT repairrating.uuid IS UNIQUE
+- CONSTRAINT ON ( technician:Technician ) ASSERT technician.uuid IS UNIQUE
+- CONSTRAINT ON ( user:User ) ASSERT user.uuid IS UNIQUE
+:indexes:
+- INDEX ON :Address(address)
+- INDEX ON :Category(categoryID)
+- INDEX ON :Customer(customerID)
+- INDEX ON :Order(orderID)
+- INDEX ON :Product(productID)
+- INDEX ON :Repair(origin)
+- INDEX ON :Repair(state)
+- INDEX ON :Supplier(supplierID)
+- INDEX ON :Technician(background_checked)
+- INDEX ON :Technician(blacklisted)
+- INDEX ON :Technician(preferred)
+- INDEX ON :User(auth0_id)
+- INDEX ON :User(email)
+:versions:
+- '20171007070606'
+- '20171017020855'
+- '20171221041803'

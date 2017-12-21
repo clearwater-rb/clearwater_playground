@@ -2,4 +2,4 @@
 
 bundle check || bundle -j12
 
-rerun -i 'assets/**/*' "puma $*"
+rerun -i 'assets/**/*' "bundle exec ruby -S puma $*"

@@ -9,4 +9,5 @@ use Rack::Session::Cookie, secret: ENV.fetch('SESSION_SECRET') {
   SecureRandom.hex
 }
 use Rack::Deflater
+use Rack::CommonLogger
 run ClearwaterPlayground

@@ -1,6 +1,5 @@
 require 'roda'
 require 'roda/opal_assets'
-require 'opal'
 require 'clearwater'
 require 'grand_central'
 

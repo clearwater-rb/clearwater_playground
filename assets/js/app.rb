@@ -1,41 +1,157 @@
 require 'opal'
 require 'clearwater'
-require 'grand_central'
 require 'forwardable'
 require 'opal/compiler'
 require 'clearwater/black_box_node'
+require 'clearwater/memoized_component'
+require 'grand_central'
+
+require 'store'
+require 'routing'
 
 class Layout
   include Clearwater::Component
+  include Routing
+
+  def render
+    div([
+      h1({ style: Style.heading }, 'Clearwater Playground'),
+
+      ErrorMessages.new(errors),
+      route do |r|
+        r.unique_match('playgrounds/:id') { |match, id| Playground.memoize(id)[:playground] }
+        r.unique_match('playgrounds') { PlaygroundList.memoize[:playground_list] }
+        r.miss { Playground.memoize nil }
+      end,
+    ])
+  end
+
+  def errors
+    Store.state.errors
+  end
+
+  module Style
+    module_function
+
+    def heading
+      {
+        'font-size': '2.5vh',
+        font_family: [
+          'Helvetica Neue',
+          'Sans-Serif',
+        ],
+        height: '3vh',
+      }
+    end
+  end
+end
+
+class PlaygroundList < Clearwater::MemoizedComponent
+  def initialize
+    @playgrounds = :loading
+
+    Bowser::HTTP.fetch('/api/playgrounds')
+      .then(&:json)
+      .then do |json|
+        @playgrounds = json[:playgrounds].map { |attrs| Playground.new(attrs) }
+        call
+      end
+  end
+
+  def render
+    case @playgrounds
+    when :loading
+      p 'Loading...'
+    when Array
+      div([
+        ul(@playgrounds.map { |playground|
+          li([
+            Link.new({ href: "/playgrounds/#{playground.id}" }, [
+              playground.name || playground.id,
+            ])
+          ])
+        })
+      ])
+    end
+  end
+
+  class Playground < GrandCentral::Model
+    attributes(:id, :name, :html, :css, :ruby)
+  end
+end
+
+class ErrorMessages
+  include Clearwater::Component
+
+  def initialize errors
+    @errors = errors
+  end
+
+  def render
+    return div if @errors.empty?
+
+    ul({ style: Style.container }, @errors.map { |error|
+      li([
+        button({ onclick: DeleteError[error] }, '⨉'),
+        error.message,
+      ])
+    })
+  end
+
+  module Style
+    module_function
+
+    def container
+      {
+        background_color: :pink,
+        border: '1px solid red',
+        color: :red,
+        list_style: :none,
+        padding: '1em 1.5em',
+      }
+    end
+  end
+end
+
+class Playground < Clearwater::MemoizedComponent
   extend Forwardable
 
-  delegate %w(html css ruby js) => :state
+  delegate %w(playground_id name html css ruby js) => :state
 
-  attr_reader :store
+  attr_reader :id
 
-  def initialize(store)
-    @store = store
+  def initialize id
+    @id = id
+    FetchPlayground.call id if id
+  end
+
+  def update new_id
+    if new_id != id
+      @id = new_id
+      FetchPlayground.call new_id
+    end
   end
 
   def render
     div([
-      Header.new(html, css, ruby),
-      CodeEditor.new(html, css, ruby, js),
+      Header.new(name, html, css, ruby),
+      CodeEditor.new(playground_id, html, css, ruby, js),
       RunningExample.new(html, css, js),
     ])
   end
 
   def state
-    store.state
+    Store.state
   end
 end
 
 class Header
   include Clearwater::Component
 
-  attr_reader :html, :css, :ruby
+  attr_reader :name, :html, :css, :ruby
 
-  def initialize html, css, ruby
+  def initialize name, html, css, ruby
+    @name = name
     @html = html
     @css = css
     @ruby = ruby
@@ -43,23 +159,23 @@ class Header
 
   def render
     div([
-      h1({
+      input(
+        oninput: SetPlaygroundName,
+        value: name,
+        placeholder: 'Name this app',
         style: {
-          'font-size': '2.5vh',
-          font_family: [
-            'Helvetica Neue',
-            'Sans-Serif',
-          ],
-          height: '3vh',
-        },
-      }, [
-        'Clearwater Playground',
-      ]),
+          font_size: '1.75em',
+          font_weight: :bold,
+          padding: '0.25em 0.5em',
+          margin_bottom: '0.3em',
+        }
+      ),
       div([
         [html, css, ruby].map { |lang|
           button({ onclick: ToggleEditor[lang] }, "Toggle #{lang.name}")
         },
         button({ onclick: ToggleJS }, 'Toggle compiled JS'),
+        button({ onclick: SavePlayground }, 'Save'),
       ]),
     ])
   end
@@ -68,10 +184,10 @@ end
 class CodeEditor
   include Clearwater::Component
 
-  attr_reader :html, :css, :ruby, :js
+  attr_reader :id, :html, :css, :ruby, :js
 
-  def initialize(html, css, ruby, js)
-    @html, @css, @ruby, @js = html, css, ruby, js
+  def initialize(id, html, css, ruby, js)
+    @id, @html, @css, @ruby, @js = id, html, css, ruby, js
   end
 
   def render
@@ -79,7 +195,7 @@ class CodeEditor
       [html, css, ruby].map { |lang|
         if lang.show?
           div({ style: Style.editor(total_editors) }, [
-            AceEditor.new(lang)
+            AceEditor.new(id, lang)
           ])
         end
       },
@@ -109,7 +225,7 @@ class CodeEditor
 
     def editor(total_editors=1)
       {
-        height: "#{90 / [total_editors, 1].max}vh",
+        height: "#{85 / [total_editors, 1].max}vh",
         vertical_align: :top,
       }
     end
@@ -119,9 +235,10 @@ end
 class AceEditor
   include Clearwater::BlackBoxNode
 
-  attr_reader :editor, :height
+  attr_reader :playground_id, :editor, :height, :code
 
-  def initialize lang
+  def initialize playground_id, lang
+    @playground_id = playground_id
     @lang = lang
     @id = lang.name
     @code = lang.code
@@ -135,6 +252,7 @@ class AceEditor
     Clearwater::Component.div({
       id: @lang.name,
       style: {
+        # color: :transparent,
         height: '100%',
         font_size: '16px',
       },
@@ -158,6 +276,11 @@ class AceEditor
     # Copy properties from previous instance
     @editor = previous.editor
     @height = previous.height
+
+    if playground_id != previous.playground_id
+      @editor.JS.setValue code.to_s
+      @editor.JS.clearSelection
+    end
 
     Bowser.window.animation_frame do
       # If they're different, tell the editor
@@ -265,7 +388,7 @@ class RunningExample
         display: 'inline-block',
         vertical_align: :top,
         width: '50%',
-        height: '90vh'
+        height: '85vh'
       },
     )
   end
@@ -328,6 +451,7 @@ class RunningExample
                 self.$virtual_dom().$render(rendered);
               } catch(e) {
                 console.error(e);
+                console.error(e.stack);
                 jsErrorContainer.innerText = [e.name, e.message].$join(' - ');
               }
             }
@@ -342,162 +466,11 @@ class RunningExample
   end
 end
 
-router = Clearwater::Router.new do
-end
-
-class Language < GrandCentral::Model
-  attributes :name, :code, :show
-
-  def initialize *args
-    super
-
-    @show = false if show.nil?
-  end
-
-  alias show? show
-end
-
-class AppSerializer
-  attr_reader :app
-
-  def initialize app
-    @app = app
-  end
-
-  # attributes :id, :html, :css, :ruby, :show_js
-  def call
-    {
-      name: app.name,
-      html: {
-        name: 'html',
-        code: app.html.code,
-        show: app.html.show,
-      },
-      css: {
-        name: 'css',
-        code: app.css.code,
-        show: app.css.show,
-      },
-      ruby: {
-        name: 'ruby',
-        code: app.ruby.code,
-        show: app.ruby.show,
-      },
-      show_js: app.show_js,
-    }
-  end
-end
-
-Action = GrandCentral::Action.create
-
-UpdateCode = Action.with_attributes(:language, :code)
-ToggleEditor = Action.with_attributes(:language)
-ToggleJS = Action.create
-SaveApp = Action.with_attributes(:app) do
-  def promise
-    p AppSerializer.new(app).call
-    Promise.resolve
-    # Bowser::HTTP.upload("/api/apps/#{app.id}", AppSerializer.new(app).call)
-  end
-end
-
-class AppState < GrandCentral::Model
-  attributes :id, :html, :css, :ruby, :show_js
-
-  alias show_js? show_js
-
-  def js
-    @js ||= Language.new(
-      name: 'js',
-      code: compile_js,
-      show: show_js,
-    )
-  end
-
-  def persisted?
-    !!id
-  end
-
-  def compile_js
-    start = Time.now
-    Opal.compile(ruby.code.to_s).to_s
-  rescue SyntaxError => e
-    <<-JS
-/*
-#{e.message}
-*/
-    JS
-  ensure
-    finish = Time.now
-    puts "Compiled (or errored) in #{(finish - start) * 1000}ms"
-  end
-end
-
-initial_state = AppState.new(
-  html: Language.new(
-    name: 'html',
-    code: <<-HTML,
-<div id="app"></div>
-    HTML
-  ),
-  css: Language.new(
-    name: 'css',
-    code: <<-CSS,
-    CSS
-  ),
-  ruby: Language.new(
-    name: 'ruby',
-    code: <<-RUBY,
-class Layout
-  include Clearwater::Component
-
-  def render
-    div([
-      h1('Hello World!'),
-      p('Welcome to Clearwater!'),
-    ])
-  end
-end
-
-Clearwater::Application.new(
-  component: Layout.new,
-  element: Bowser.document['#app'],
-).call
-    RUBY
-    show: true,
-  ),
-  show_js: false,
-)
-
-store = GrandCentral::Store.new(initial_state) do |state, action|
-  case action
-  when UpdateCode
-    new_state = state.update(
-      action.language.name => action.language.update(
-        code: action.code,
-      ),
-    )
-  when ToggleEditor
-    state.update(
-      action.language.name => action.language.update(
-        show: !action.language.show?,
-      ),
-    )
-  when ToggleJS
-    state.update show_js: !state.show_js?
-  else
-    state
-  end
-end
-
-Action.store = store
-
 app = Clearwater::Application.new(
-  component: Layout.new(store),
-  router: router,
+  component: Layout.new,
   element: Bowser.document['#app'],
 )
 
 app.call
 
-store.on_dispatch { app.render }
+Store.on_dispatch { app.render }

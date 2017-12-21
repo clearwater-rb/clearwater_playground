@@ -1,33 +1,75 @@
 require 'roda'
-require 'app_repo'
+require 'primalize'
+
+require 'models/playground'
 
 class API < Roda
-  plugin :json
-  plugin :json_parser
+  plugin :json, classes: [Hash, Array, Primalize::Many]
+  plugin :json_parser, parser: proc { |string| JSON.parse(string, symbolize_names: true) }
   plugin :empty_root
+  plugin :all_verbs
 
   route do |r|
-    r.on 'apps' do
+    r.on 'playgrounds' do
       r.on :app_id do |id|
-        app = AppRepo[id]
+        playground = Playground.find(id)
 
         r.get do
-          {
-            app: app,
-          }
+          PlaygroundResponse.new(playground: playground)
+        end
+
+        r.put do
+          playground.update r.params[:playground]
+
+          PlaygroundResponse.new(playground: playground)
         end
       end
 
       r.post do
-        p r.params
+        playground = Playground.new(r.params[:playground])
+
+        if playground.save
+          PlaygroundResponse.new(playground: playground)
+        else
+          PlaygroundErrorResponse.new(errors: playground.errors.to_a)
+        end
       end
+
+      PlaygroundsResponse.new(
+        playgrounds: Playground.all,
+      )
     end
   end
 
-  class App
-    def initialize(id: nil, name:)
-      @id = attrs[:id]
-      @name = attrs[:name]
-    end
+  class PlaygroundSerializer < Primalize::Single
+    attributes(
+      id: string,
+      name: optional(string),
+      html: string,
+      css: string,
+      ruby: string,
+    )
+  end
+
+  class PlaygroundsResponse < Primalize::Many
+    attributes(
+      playgrounds: enumerable(PlaygroundSerializer),
+    )
+  end
+
+  class PlaygroundResponse < Primalize::Many
+    attributes(
+      playground: PlaygroundSerializer,
+    )
+  end
+
+  class ErrorSerializer < Primalize::Single
+    attributes(message: string)
+  end
+
+  class ErrorResponse < Primalize::Many
+    attributes(
+      errors: enumerable(ErrorSerializer),
+    )
   end
 end
