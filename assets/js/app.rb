@@ -15,7 +15,7 @@ class Layout
 
   def render
     div([
-      h1({ style: Style.heading }, 'Clearwater Playground'),
+      h1({ style: Style.heading }, Link.new({ href: '/' }, 'Clearwater Playground')),
 
       ErrorMessages.new(errors),
       route do |r|
