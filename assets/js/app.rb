@@ -168,6 +168,8 @@ class Header
           font_weight: :bold,
           padding: '0.25em 0.5em',
           margin_bottom: '0.3em',
+          width: '100%',
+          box_sizing: 'border-box',
         }
       ),
       div([
