@@ -6,7 +6,8 @@ require 'grand_central'
 require 'api'
 
 class ClearwaterPlayground < Roda
-  plugin :public
+  caching = 'public, max-age=3600'
+  plugin :public, headers: { 'Cache-Control' => caching }
 
   assets = Roda::OpalAssets.new
 
@@ -16,6 +17,7 @@ class ClearwaterPlayground < Roda
 
     r.on('api') { r.run API }
 
+    response.headers['Cache-Control'] = caching
     <<-HTML
 <!DOCTYPE html>
 <html>
