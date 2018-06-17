@@ -1,6 +1,6 @@
 source 'https://rubygems.org'
 
-gem 'clearwater', git: 'https://github.com/clearwater-rb/clearwater.git' # '~> 1.0.0.rc5'
+gem 'clearwater'
 gem 'grand_central'
 gem 'roda'
 gem 'roda-opal_assets'
