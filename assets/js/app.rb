@@ -421,10 +421,11 @@ class RunningExample
     <<-HTML
 <!DOCTYPE html>
 <style>#{@css.code}</style>
-#{@html.code}
 <div id="js-error-container" style='background-color: darkred; color: #f99; position: absolute; bottom: 0; left: 0; right: 0; overflow: scroll;'></div>
 <div id="ruby-error-container" style='background-color: darkred; color: #f99; position: absolute; bottom: 0; left: 0; right: 0; overflow: scroll;'></div>
+<script>console.clear();</script>
 <script src="/playground_boilerplate.js"></script>
+#{@html.code}
 <script>
   #{patch_clearwater}
   try {
